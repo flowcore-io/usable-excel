@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Dev certs (machine-specific, never commit)
+*.crt
+*.key
+*.pfx
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# npm
+npm-debug.log*
+package-lock.json

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <!-- ==== Identity ==== -->
+  <Id>00000000-0000-0000-0000-000000000001</Id>
+  <Version>1.0.0.1</Version>
+  <ProviderName>Usable</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Usable Excel" />
+  <Description DefaultValue="AI-powered Excel assistant — talk to Usable Chat and let AI read, write, and manipulate your spreadsheet." />
+
+  <!-- ==== Icons (place 32×32 and 80×80 PNGs in /assets/) ==== -->
+  <IconUrl DefaultValue="https://localhost:3333/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:3333/assets/icon-80.png" />
+  <SupportUrl DefaultValue="https://usable.dev" />
+
+  <!-- ==== Allowed external domains ==== -->
+  <AppDomains>
+    <AppDomain>https://chat.usable.dev</AppDomain>
+    <AppDomain>https://api.usable.dev</AppDomain>
+  </AppDomains>
+
+  <!-- ==== Hosts ==== -->
+  <Hosts>
+    <Host Name="Workbook" />
+  </Hosts>
+
+  <!-- ==== Default settings ==== -->
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:3333/taskpane.html" />
+  </DefaultSettings>
+
+  <!-- ==== Permissions ==== -->
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <!-- ==== Version overrides (ribbon button + modern task pane) ==== -->
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+
+    <Hosts>
+      <Host xsi:type="Workbook">
+
+        <DesktopFormFactor>
+
+          <!-- Commands page (ribbon handlers) -->
+          <GetStarted>
+            <Title resid="GetStarted.Title" />
+            <Description resid="GetStarted.Description" />
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl" />
+          </GetStarted>
+
+          <!-- Ribbon extension -->
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="Usable.Group">
+                <Label resid="Group.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16" />
+                  <bt:Image size="32" resid="Icon.32x32" />
+                  <bt:Image size="80" resid="Icon.80x80" />
+                </Icon>
+                <Control xsi:type="Button" id="Usable.OpenTaskPane">
+                  <Label resid="OpenTaskPane.Label" />
+                  <Supertip>
+                    <Title resid="OpenTaskPane.Label" />
+                    <Description resid="OpenTaskPane.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16" />
+                    <bt:Image size="32" resid="Icon.32x32" />
+                    <bt:Image size="80" resid="Icon.80x80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <!-- Strings -->
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="Get started with Usable Excel" />
+        <bt:String id="Group.Label" DefaultValue="Usable" />
+        <bt:String id="OpenTaskPane.Label" DefaultValue="Open Usable Chat" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="Open the Usable Chat panel to start working with AI in Excel." />
+        <bt:String id="GetStarted.LearnMoreUrl" DefaultValue="https://usable.dev" />
+        <bt:String id="OpenTaskPane.Tooltip" DefaultValue="Open the Usable AI chat panel to read, write, and analyse your spreadsheet with AI." />
+      </bt:LongStrings>
+
+      <!-- URLs -->
+      <bt:Urls>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3333/taskpane.html" />
+        <bt:Url id="Commands.Url" DefaultValue="https://localhost:3333/commands.html" />
+      </bt:Urls>
+
+      <!-- Icons -->
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3333/assets/icon-16.png" />
+        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3333/assets/icon-32.png" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3333/assets/icon-80.png" />
+      </bt:Images>
+    </Resources>
+
+  </VersionOverrides>
+
+</OfficeApp>
