@@ -91,7 +91,7 @@
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started with Usable Excel" />
         <bt:String id="Group.Label" DefaultValue="Usable" />
-        <bt:String id="OpenTaskPane.Label" DefaultValue="Open Usable Chat" />
+        <bt:String id="OpenTaskPane.Label" DefaultValue="Usable Chat" />
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="Open the Usable Chat panel to start working with AI in Excel." />

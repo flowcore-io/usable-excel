@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign in to Usable</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        background: #f5f5f5;
+        color: #333;
+      }
+      .card {
+        background: #fff;
+        border-radius: 8px;
+        padding: 32px 28px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+        text-align: center;
+        max-width: 320px;
+        width: 100%;
+      }
+      h2 { margin: 0 0 8px; font-size: 18px; }
+      p  { margin: 0 0 20px; font-size: 13px; color: #666; }
+      .spinner {
+        width: 28px; height: 28px;
+        border: 3px solid #e0e0e0;
+        border-top-color: #0F6CBD;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin: 0 auto 12px;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .error { color: #c00; font-size: 13px; margin-top: 12px; }
+    </style>
+  </head>
+  <body>
+    <!-- Loaded by Office Dialog API — messageParent sends token back to taskpane -->
+    <div class="card">
+      <div class="spinner" id="spinner"></div>
+      <h2 id="title">Signing in…</h2>
+      <p id="message">Redirecting to login…</p>
+      <div class="error" id="error" style="display:none"></div>
+    </div>
+
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <script>
+      /* ------------------------------------------------------------------ */
+      /* Config                                                               */
+      /* ------------------------------------------------------------------ */
+      var KC_BASE   = 'https://auth.flowcore.io/realms/memory-mesh/protocol/openid-connect';
+      var CLIENT_ID = 'mcp_oauth_client';
+      var SCOPES    = 'openid profile email offline_access';
+      // Redirect back to this same page (handles both start and callback)
+      var REDIRECT_URI = window.location.origin + '/auth-dialog.html';
+
+      /* ------------------------------------------------------------------ */
+      /* Helpers                                                              */
+      /* ------------------------------------------------------------------ */
+      function base64UrlEncode(bytes) {
+        var str = '';
+        for (var i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+        return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+
+      async function sha256Challenge(verifier) {
+        var data   = new TextEncoder().encode(verifier);
+        var digest = await crypto.subtle.digest('SHA-256', data);
+        return base64UrlEncode(new Uint8Array(digest));
+      }
+
+      function setStatus(title, message) {
+        document.getElementById('title').textContent   = title;
+        document.getElementById('message').textContent = message;
+      }
+
+      function showError(msg) {
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('title').textContent     = 'Sign-in failed';
+        document.getElementById('message').textContent   = '';
+        var el = document.getElementById('error');
+        el.textContent = msg;
+        el.style.display = '';
+      }
+
+      /* ------------------------------------------------------------------ */
+      /* Phase 1 — Start: generate PKCE, redirect to Keycloak               */
+      /* ------------------------------------------------------------------ */
+      async function startLogin() {
+        var verifier   = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+        var challenge  = await sha256Challenge(verifier);
+        sessionStorage.setItem('pkce_verifier', verifier);
+
+        var params = new URLSearchParams({
+          response_type:         'code',
+          client_id:             CLIENT_ID,
+          redirect_uri:          REDIRECT_URI,
+          scope:                 SCOPES,
+          code_challenge:        challenge,
+          code_challenge_method: 'S256',
+        });
+
+        window.location.href = KC_BASE + '/auth?' + params.toString();
+      }
+
+      /* ------------------------------------------------------------------ */
+      /* Phase 2 — Callback: exchange code for tokens, send to parent       */
+      /* ------------------------------------------------------------------ */
+      async function handleCallback(code) {
+        setStatus('Completing sign-in…', 'Exchanging authorisation code…');
+
+        var verifier = sessionStorage.getItem('pkce_verifier');
+        if (!verifier) {
+          showError('Session lost (PKCE verifier missing). Please close and try again.');
+          Office.context.ui.messageParent(JSON.stringify({ type: 'AUTH_ERROR', error: 'pkce_verifier_missing' }));
+          return;
+        }
+
+        var body = new URLSearchParams({
+          grant_type:    'authorization_code',
+          client_id:     CLIENT_ID,
+          code:          code,
+          redirect_uri:  REDIRECT_URI,
+          code_verifier: verifier,
+        });
+
+        try {
+          var res = await fetch('/auth/token', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body:    body.toString(),
+          });
+
+          if (!res.ok) {
+            var text = await res.text();
+            throw new Error('Token exchange failed (' + res.status + '): ' + text);
+          }
+
+          var tokens = await res.json();
+          sessionStorage.removeItem('pkce_verifier');
+          setStatus('Signed in!', 'Closing…');
+
+          Office.context.ui.messageParent(JSON.stringify({
+            type:         'AUTH_SUCCESS',
+            accessToken:  tokens.access_token,
+            refreshToken: tokens.refresh_token  || null,
+            expiresIn:    tokens.expires_in     || 300,
+          }));
+        } catch (err) {
+          showError(err.message);
+          Office.context.ui.messageParent(JSON.stringify({ type: 'AUTH_ERROR', error: err.message }));
+        }
+      }
+
+      /* ------------------------------------------------------------------ */
+      /* Entry point                                                          */
+      /* ------------------------------------------------------------------ */
+      Office.onReady(function () {
+        var params = new URLSearchParams(window.location.search);
+        var code   = params.get('code');
+        var error  = params.get('error');
+
+        if (error) {
+          showError('Login cancelled or denied: ' + (params.get('error_description') || error));
+          Office.context.ui.messageParent(JSON.stringify({ type: 'AUTH_ERROR', error: error }));
+        } else if (code) {
+          handleCallback(code);
+        } else {
+          startLogin();
+        }
+      });
+    </script>
+  </body>
+</html>

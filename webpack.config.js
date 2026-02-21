@@ -64,6 +64,13 @@ module.exports = async (env, options) => {
         template: "./src/commands/commands.html",
         chunks: ["polyfill", "commands"],
       }),
+      // Self-contained OAuth dialog — no JS chunks, template output as-is
+      new HtmlWebpackPlugin({
+        filename: "auth-dialog.html",
+        template: "./src/taskpane/auth-dialog.html",
+        chunks: [],
+        inject: false,
+      }),
       new CopyWebpackPlugin({
         patterns: [
           {
@@ -94,6 +101,16 @@ module.exports = async (env, options) => {
         options: env.WEBPACK_BUILD || options.https !== undefined ? options.https : await getHttpsOptions(),
       },
       port: 3333,
+      // Proxy /auth/token → Keycloak token endpoint (avoids CORS from the dialog page)
+      proxy: [
+        {
+          context: ["/auth/token"],
+          target: "https://auth.flowcore.io",
+          pathRewrite: { "^/auth/token": "/realms/memory-mesh/protocol/openid-connect/token" },
+          changeOrigin: true,
+          secure: true,
+        },
+      ],
     },
   };
 };

@@ -52,7 +52,7 @@ const tools: ExcelTool[] = [
     schema: {
       name: "get_workbook_info",
       description:
-        "Get high-level information about the current Excel workbook: its name, how many sheets it contains, and which sheet is currently active.",
+        "Get high-level information about the current Excel workbook: its name, active sheet, and a full list of all worksheets with their names, IDs, and positions.",
       parameters: {
         type: "object",
         properties: {},
@@ -65,36 +65,14 @@ const tools: ExcelTool[] = [
         const active = sheets.getActiveWorksheet();
 
         workbook.load("name");
-        sheets.load("items/name");
+        sheets.load("items/name,items/id,items/position");
         active.load("name");
 
         await context.sync();
 
         return {
           workbookName: workbook.name,
-          sheetCount: sheets.items.length,
           activeSheet: active.name,
-        };
-      });
-    },
-  },
-
-  {
-    schema: {
-      name: "list_sheets",
-      description: "List all worksheets in the workbook, returning their names and positions.",
-      parameters: {
-        type: "object",
-        properties: {},
-      },
-    },
-    handler: async () => {
-      return Excel.run(async (context) => {
-        const sheets = context.workbook.worksheets;
-        sheets.load("items/name,items/id,items/position");
-        await context.sync();
-
-        return {
           sheets: sheets.items.map((s) => ({
             name: s.name,
             id: s.id,
@@ -577,56 +555,32 @@ const tools: ExcelTool[] = [
 
   {
     schema: {
-      name: "insert_rows",
-      description: "Insert blank rows above the specified row index (0-based).",
+      name: "manage_rows",
+      description: "Insert or delete rows at a given position. Use action='insert' to add blank rows above the row index, or action='delete' to remove rows starting at the row index.",
       parameters: {
         type: "object",
         properties: {
+          action: {
+            type: "string",
+            enum: ["insert", "delete"],
+            description: "'insert' adds blank rows above rowIndex; 'delete' removes rows starting at rowIndex.",
+          },
           sheet: { type: "string", description: "Sheet name. Defaults to the active sheet." },
-          rowIndex: { type: "number", description: "0-based row index to insert before." },
-          count: { type: "number", description: "Number of rows to insert." },
+          rowIndex: { type: "number", description: "0-based row index to insert before or delete from." },
+          count: { type: "number", description: "Number of rows to insert or delete." },
         },
-        required: ["rowIndex", "count"],
+        required: ["action", "rowIndex", "count"],
       },
     },
     handler: async (args) => {
       return Excel.run(async (context) => {
         const sheet = getSheet(context, args.sheet as string | undefined);
-        const rowIndex = args.rowIndex as number;
-        const count = args.count as number;
-        // Get the range spanning `count` rows starting at rowIndex
-        const range = sheet.getRangeByIndexes(rowIndex, 0, count, 1);
-        range.insert(Excel.InsertShiftDirection.down);
-        await context.sync();
-        return { success: true };
-      });
-    },
-  },
-
-  {
-    schema: {
-      name: "delete_rows",
-      description: "Delete rows starting at the given row index (0-based).",
-      parameters: {
-        type: "object",
-        properties: {
-          sheet: { type: "string", description: "Sheet name. Defaults to the active sheet." },
-          rowIndex: { type: "number", description: "0-based index of the first row to delete." },
-          count: { type: "number", description: "Number of rows to delete." },
-        },
-        required: ["rowIndex", "count"],
-      },
-    },
-    handler: async (args) => {
-      return Excel.run(async (context) => {
-        const sheet = getSheet(context, args.sheet as string | undefined);
-        const range = sheet.getRangeByIndexes(
-          args.rowIndex as number,
-          0,
-          args.count as number,
-          1
-        );
-        range.delete(Excel.DeleteShiftDirection.up);
+        const range = sheet.getRangeByIndexes(args.rowIndex as number, 0, args.count as number, 1);
+        if (args.action === "insert") {
+          range.insert(Excel.InsertShiftDirection.down);
+        } else {
+          range.delete(Excel.DeleteShiftDirection.up);
+        }
         await context.sync();
         return { success: true };
       });

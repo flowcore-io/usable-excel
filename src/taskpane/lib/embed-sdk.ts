@@ -36,6 +36,8 @@ export interface UsableChatEmbedOptions {
   onToolCall?: ToolCallHandler;
   onError?: (code: string, message: string) => void;
   onConversationChange?: (conversationId: string | null) => void;
+  /** Called when the embed requests a fresh token. Return the new access token, or null on failure. */
+  onTokenRefreshRequired?: () => Promise<string | null>;
 }
 
 export class UsableChatEmbed {
@@ -161,7 +163,11 @@ export class UsableChatEmbed {
       }
 
       case "REQUEST_TOKEN_REFRESH":
-        if (this.cachedToken) {
+        if (this.options.onTokenRefreshRequired) {
+          this.options.onTokenRefreshRequired().then((token) => {
+            if (token) this.setAuth(token);
+          });
+        } else if (this.cachedToken) {
           this.setAuth(this.cachedToken);
         }
         break;
