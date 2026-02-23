@@ -5,7 +5,7 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const path = require("path");
 
 const urlDev = "https://localhost:3333/";
-const urlProd = "https://www.contoso.com/"; // CHANGE to your prod URL
+const urlProd = "https://flowcore-io.github.io/usable-excel/";
 
 async function getHttpsOptions() {
   const httpsOptions = await devCerts.getHttpsServerOptions();
@@ -26,6 +26,7 @@ module.exports = async (env, options) => {
     output: {
       clean: true,
       path: path.resolve(__dirname, "dist"),
+      publicPath: dev ? "/" : "/usable-excel/",
     },
     resolve: {
       extensions: [".ts", ".tsx", ".html", ".js"],
