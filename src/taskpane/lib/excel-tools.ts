@@ -690,14 +690,9 @@ const tools: ExcelTool[] = [
           (Excel.ChartType as Record<string, Excel.ChartType>)[chartTypeName] ??
           Excel.ChartType.columnClustered;
 
-        const chart = sheet.charts.add(
-          chartType,
-          dataRange,
-          Excel.ChartSeriesBy.auto
-        );
-        chart.load("name,id");
+        sheet.charts.add(chartType, dataRange, Excel.ChartSeriesBy.auto);
         await context.sync();
-        return { name: chart.name, id: chart.id };
+        return { success: true, chartType: chartTypeName, dataAddress: args.dataAddress as string };
       });
     },
   },
@@ -713,6 +708,32 @@ const handlerMap: Map<string, ExcelToolHandler> = new Map(
   tools.map((t) => [t.schema.name, t.handler])
 );
 
+// WHY THIS EXISTS
+// ─────────────────────────────────────────────────────────────────────────────
+// In this environment (Office.js task pane on macOS / WKWebView + React legacy
+// mode), two `window.addEventListener("message", ...)` listeners can become
+// active simultaneously for a single UsableChatEmbed instance. This is caused
+// by a combination of:
+//
+//   1. React legacy mode (ReactDOM.render) does not batch async state updates.
+//      The two setState calls in useAuth's refreshAccessToken fire as separate
+//      renders, which can briefly double-mount ChatPane and leave an orphaned
+//      listener from the first mount.
+//
+//   2. Office.js / WKWebView has known quirks where the task pane JS context
+//      can initialise in ways that React's effect cleanup does not fully
+//      intercept.
+//
+// The result: a single TOOL_CALL postMessage is received by both listeners,
+// causing handleExcelToolCall — and therefore Excel.run() — to execute twice.
+// Non-idempotent operations like add_chart produce duplicate artefacts;
+// others silently double-write or fail on the second attempt.
+//
+// FIX: track in-flight calls by (toolName + serialised args). If an identical
+// call arrives while one is already running, return the same promise so
+// Excel.run() only executes once. The second TOOL_RESPONSE is harmless.
+const inFlightCalls = new Map<string, Promise<unknown>>();
+
 export async function handleExcelToolCall(
   toolName: string,
   args: unknown
@@ -721,5 +742,15 @@ export async function handleExcelToolCall(
   if (!handler) {
     throw new Error(`Unknown Excel tool: "${toolName}"`);
   }
-  return handler(args as Record<string, unknown>);
+
+  const key = `${toolName}:${JSON.stringify(args)}`;
+  const existing = inFlightCalls.get(key);
+  if (existing) return existing;
+
+  const promise = handler(args as Record<string, unknown>).then(
+    (result) => { inFlightCalls.delete(key); return result; },
+    (err)    => { inFlightCalls.delete(key); throw err; }
+  );
+  inFlightCalls.set(key, promise);
+  return promise;
 }

@@ -6,9 +6,7 @@ import { App } from "./App";
 // Office.onReady() fires when the Office host is ready to receive API calls.
 Office.onReady((_info) => {
   ReactDOM.render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
+    <App />,
     document.getElementById("container")
   );
 });
