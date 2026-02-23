@@ -8,7 +8,7 @@
 
   <!-- ==== Identity ==== -->
   <Id>00000000-0000-0000-0000-000000000001</Id>
-  <Version>1.0.1.0</Version>
+  <Version>1.0.1.1</Version>
   <ProviderName>Usable</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Usable Excel" />
@@ -86,10 +86,10 @@
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="Open the Usable Chat panel to start working with AI in Excel." />
-        <bt:String id="GetStarted.LearnMoreUrl" DefaultValue="https://usable.dev" />
         <bt:String id="OpenTaskPane.Tooltip" DefaultValue="Open the Usable AI chat panel to read, write, and analyse your spreadsheet with AI." />
       </bt:LongStrings>
       <bt:Urls>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://usable.dev" />
         <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3333/taskpane.html" />
         <bt:Url id="Commands.Url" DefaultValue="https://localhost:3333/commands.html" />
       </bt:Urls>
