@@ -161,7 +161,8 @@ export function useAuth(): AuthResult {
   // -------------------------------------------------------------------------
 
   const login = useCallback(() => {
-    const dialogUrl = `${window.location.origin}/auth-dialog.html`;
+    const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+    const dialogUrl = `${window.location.origin}${basePath}auth-dialog.html`;
 
     Office.context.ui.displayDialogAsync(
       dialogUrl,
