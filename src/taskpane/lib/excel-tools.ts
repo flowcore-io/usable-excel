@@ -674,8 +674,9 @@ const tools: ExcelTool[] = [
           },
           chartType: {
             type: "string",
+            enum: ["ColumnClustered", "BarClustered", "Line", "Pie", "Area", "XYScatter"],
             description:
-              "Chart type. Supported: 'ColumnClustered', 'BarClustered', 'Line', 'Pie', 'Area', 'XYScatter'. Defaults to 'ColumnClustered'.",
+              "Chart type. Use 'Pie' for pie charts, 'Line' for line charts, 'ColumnClustered' for column/bar charts (default), 'BarClustered' for horizontal bar charts, 'Area' for area charts, 'XYScatter' for scatter plots.",
           },
         },
         required: ["dataAddress"],
@@ -686,9 +687,10 @@ const tools: ExcelTool[] = [
         const sheet = getSheet(context, args.sheet as string | undefined);
         const dataRange = sheet.getRange(args.dataAddress as string);
         const chartTypeName = (args.chartType as string) ?? "ColumnClustered";
-        const chartType =
-          (Excel.ChartType as Record<string, Excel.ChartType>)[chartTypeName] ??
-          Excel.ChartType.columnClustered;
+        const validChartTypes = new Set<string>(Object.values(Excel.ChartType));
+        const chartType = validChartTypes.has(chartTypeName)
+          ? (chartTypeName as Excel.ChartType)
+          : Excel.ChartType.columnClustered;
 
         sheet.charts.add(chartType, dataRange, Excel.ChartSeriesBy.auto);
         await context.sync();
