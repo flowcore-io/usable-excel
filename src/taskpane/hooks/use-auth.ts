@@ -157,6 +157,24 @@ export function useAuth(): AuthResult {
   }, [refreshAccessToken]);
 
   // -------------------------------------------------------------------------
+  // Refresh token when the task pane becomes visible again.
+  // In Office add-in WebViews (WebView2/WKWebView), setTimeout is throttled
+  // while the add-in is hidden, so the proactive timer may fire late or not
+  // at all. Calling refreshAccessToken() on visibility restore ensures the
+  // embed always gets a fresh token after the user returns to the add-in.
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshAccessToken();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [refreshAccessToken]);
+
+  // -------------------------------------------------------------------------
   // login — open Office Dialog with PKCE flow
   // -------------------------------------------------------------------------
 
