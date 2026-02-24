@@ -674,9 +674,51 @@ const tools: ExcelTool[] = [
           },
           chartType: {
             type: "string",
-            enum: ["ColumnClustered", "BarClustered", "Line", "Pie", "Area", "XYScatter"],
+            enum: [
+              // Column
+              "ColumnClustered", "ColumnStacked", "ColumnStacked100",
+              "3DColumnClustered", "3DColumnStacked", "3DColumnStacked100", "3DColumn",
+              "CylinderColClustered", "CylinderColStacked", "CylinderColStacked100", "CylinderCol",
+              "ConeColClustered", "ConeColStacked", "ConeColStacked100", "ConeCol",
+              "PyramidColClustered", "PyramidColStacked", "PyramidColStacked100", "PyramidCol",
+              // Bar (horizontal)
+              "BarClustered", "BarStacked", "BarStacked100",
+              "3DBarClustered", "3DBarStacked", "3DBarStacked100",
+              "CylinderBarClustered", "CylinderBarStacked", "CylinderBarStacked100",
+              "ConeBarClustered", "ConeBarStacked", "ConeBarStacked100",
+              "PyramidBarClustered", "PyramidBarStacked", "PyramidBarStacked100",
+              // Line
+              "Line", "3DLine",
+              "LineStacked", "LineStacked100",
+              "LineMarkers", "LineMarkersStacked", "LineMarkersStacked100",
+              // Pie / Donut
+              "Pie", "3DPie", "PieExploded", "3DPieExploded", "PieOfPie", "BarOfPie",
+              "Doughnut", "DoughnutExploded",
+              // Area
+              "Area", "3DArea", "AreaStacked", "AreaStacked100", "3DAreaStacked", "3DAreaStacked100",
+              // Scatter / Bubble
+              "XYScatter", "XYScatterSmooth", "XYScatterSmoothNoMarkers", "XYScatterLines", "XYScatterLinesNoMarkers",
+              "Bubble", "Bubble3DEffect",
+              // Stock
+              "StockHLC", "StockOHLC", "StockVHLC", "StockVOHLC",
+              // Surface / Radar
+              "Surface", "SurfaceWireframe", "SurfaceTopView", "SurfaceTopViewWireframe",
+              "Radar", "RadarMarkers", "RadarFilled",
+              // Modern / statistical
+              "Histogram", "Boxwhisker", "Pareto", "Waterfall", "Funnel",
+              "Treemap", "Sunburst", "RegionMap",
+            ],
             description:
-              "Chart type. Use 'Pie' for pie charts, 'Line' for line charts, 'ColumnClustered' for column/bar charts (default), 'BarClustered' for horizontal bar charts, 'Area' for area charts, 'XYScatter' for scatter plots.",
+              "Chart type. Defaults to 'ColumnClustered'. " +
+              "Columns/bars: ColumnClustered, ColumnStacked, ColumnStacked100, BarClustered, BarStacked, BarStacked100 (also 3D/Cylinder/Cone/Pyramid variants). " +
+              "Line: Line, LineMarkers, LineStacked, LineMarkersStacked (and *100 variants). " +
+              "Pie/Donut: Pie, 3DPie, PieExploded, PieOfPie, BarOfPie, Doughnut, DoughnutExploded. " +
+              "Area: Area, AreaStacked, AreaStacked100 (also 3D variants). " +
+              "Scatter/Bubble: XYScatter, XYScatterSmooth, XYScatterSmoothNoMarkers, XYScatterLines, XYScatterLinesNoMarkers, Bubble, Bubble3DEffect. " +
+              "Stock: StockHLC (High-Low-Close), StockOHLC, StockVHLC, StockVOHLC. " +
+              "Surface: Surface, SurfaceWireframe, SurfaceTopView, SurfaceTopViewWireframe. " +
+              "Radar: Radar, RadarMarkers, RadarFilled. " +
+              "Statistical/modern: Histogram, Boxwhisker, Pareto, Waterfall, Funnel, Treemap, Sunburst, RegionMap.",
           },
         },
         required: ["dataAddress"],
