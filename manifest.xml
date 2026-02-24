@@ -8,7 +8,7 @@
 
   <!-- ==== Identity ==== -->
   <Id>00000000-0000-0000-0000-000000000001</Id>
-  <Version>1.0.0.2</Version>
+  <Version>1.0.0.3</Version>
   <ProviderName>Usable</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Usable Excel" />
@@ -87,6 +87,20 @@
     </Hosts>
 
     <Resources>
+      <!-- Icons -->
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3333/assets/icon-16.png" />
+        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3333/assets/icon-32.png" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3333/assets/icon-80.png" />
+      </bt:Images>
+
+      <!-- URLs -->
+      <bt:Urls>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://usable.dev" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3333/taskpane.html" />
+        <bt:Url id="Commands.Url" DefaultValue="https://localhost:3333/commands.html" />
+      </bt:Urls>
+
       <!-- Strings -->
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started with Usable Excel" />
@@ -98,19 +112,6 @@
         <bt:String id="OpenTaskPane.Tooltip" DefaultValue="Open the Usable AI chat panel to read, write, and analyse your spreadsheet with AI." />
       </bt:LongStrings>
 
-      <!-- URLs -->
-      <bt:Urls>
-        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://usable.dev" />
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3333/taskpane.html" />
-        <bt:Url id="Commands.Url" DefaultValue="https://localhost:3333/commands.html" />
-      </bt:Urls>
-
-      <!-- Icons -->
-      <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3333/assets/icon-16.png" />
-        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3333/assets/icon-32.png" />
-        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3333/assets/icon-80.png" />
-      </bt:Images>
     </Resources>
 
   </VersionOverrides>
