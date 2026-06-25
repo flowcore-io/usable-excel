@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Usable Excel — Certification Testing Notes</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #1a1a1a;
+      padding: 48px 56px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #0F6CBD;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 28px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #0F6CBD;
+    }
+    h2 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-top: 24px;
+      margin-bottom: 8px;
+      color: #0F6CBD;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    p { margin-bottom: 10px; }
+    ul, ol {
+      margin: 6px 0 10px 20px;
+    }
+    li { margin-bottom: 4px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 16px;
+      font-size: 12px;
+    }
+    th {
+      background: #0F6CBD;
+      color: #fff;
+      text-align: left;
+      padding: 7px 10px;
+      font-weight: 600;
+    }
+    td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    tr:nth-child(even) td { background: #f5f9fd; }
+    code {
+      background: #f0f0f0;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 12px;
+    }
+    .note {
+      background: #f0f7ff;
+      border-left: 3px solid #0F6CBD;
+      padding: 10px 14px;
+      margin: 12px 0;
+      border-radius: 0 4px 4px 0;
+      font-size: 12px;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 12px;
+      border-top: 1px solid #ddd;
+      font-size: 11px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Usable Excel — Certification Testing Notes</h1>
+  <div class="subtitle">
+    Product: Usable Excel &nbsp;|&nbsp; Version: 1.0.1.3 &nbsp;|&nbsp;
+    Manifest: https://flowcore-io.github.io/usable-excel/manifest.prod.xml
+  </div>
+
+  <h2>1. Authentication</h2>
+  <p>The add-in requires a Usable account to function.</p>
+  <ul>
+    <li>Accounts are <strong>free</strong> — sign up at <strong>https://usable.dev</strong></li>
+    <li>No credit card or purchase required at any point</li>
+    <li>After signing up, click <strong>Sign in</strong> in the task pane and complete the OAuth login flow</li>
+    <li>The add-in uses Keycloak PKCE OAuth via the Office Dialog API (standard Office Add-In pattern)</li>
+  </ul>
+
+  <h2>2. Installing the add-in for testing</h2>
+  <p><strong>Option A — Via AppSource (once published):</strong></p>
+  <p>Open Excel → Insert → Add-ins → search "Usable Excel"</p>
+
+  <p><strong>Option B — Sideload the manifest directly:</strong></p>
+  <ol>
+    <li>Download: <code>https://flowcore-io.github.io/usable-excel/manifest.prod.xml</code></li>
+    <li><strong>Excel on the web:</strong> Insert → Add-ins → Upload My Add-in → paste the URL or upload the file</li>
+    <li><strong>Excel on Windows/Mac:</strong> Insert → Add-ins → My Add-ins → Upload My Add-in</li>
+  </ol>
+
+  <h2>3. Opening the add-in</h2>
+  <p>Once installed:</p>
+  <ol>
+    <li>Go to the <strong>Home</strong> ribbon tab</li>
+    <li>Click <strong>Usable Chat</strong> in the Usable group</li>
+    <li>The task pane opens and loads the Usable Chat interface</li>
+    <li>Sign in with a free Usable account if prompted</li>
+  </ol>
+
+  <h2>4. Test scenarios</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Scenario</th>
+        <th>What to type in the chat</th>
+        <th>Expected result</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Read workbook</td>
+        <td>"What sheets are in this workbook?"</td>
+        <td>AI lists the sheet names</td>
+      </tr>
+      <tr>
+        <td>Read cells</td>
+        <td>"What's in cell A1?"</td>
+        <td>AI reads and describes the value</td>
+      </tr>
+      <tr>
+        <td>Write to a cell</td>
+        <td>"Write 'Hello World' in cell A1"</td>
+        <td>Cell A1 contains Hello World</td>
+      </tr>
+      <tr>
+        <td>Format cells</td>
+        <td>"Make A1 bold and blue"</td>
+        <td>Cell A1 is bold with blue text</td>
+      </tr>
+      <tr>
+        <td>Create a sheet</td>
+        <td>"Add a new sheet called Summary"</td>
+        <td>New sheet appears in the workbook</td>
+      </tr>
+      <tr>
+        <td>Sort data</td>
+        <td>"Sort column A ascending"</td>
+        <td>Column A sorted A→Z</td>
+      </tr>
+      <tr>
+        <td>Apply formula</td>
+        <td>"Put =SUM(A1:A10) in cell B1"</td>
+        <td>Formula applied to B1</td>
+      </tr>
+      <tr>
+        <td>Create a chart</td>
+        <td>"Create a bar chart from A1:B5"</td>
+        <td>Chart inserted in the sheet</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>5. Notes for reviewers</h2>
+  <ul>
+    <li>The add-in connects to <code>https://chat.usable.dev</code> (declared in AppDomains in the manifest)</li>
+    <li>All AI processing is handled by the Usable service at <code>https://api.usable.dev</code></li>
+    <li>Authentication is handled by Keycloak at <code>https://auth.flowcore.io</code></li>
+    <li>The add-in has <code>ReadWriteDocument</code> permissions — required to read and write spreadsheet data</li>
+    <li>No spreadsheet data is sent to or stored on Usable servers. An optional chat history is stored locally in the browser's IndexedDB on the user's device and never leaves it; the user can delete it at any time from the in-app history panel</li>
+  </ul>
+
+  <div class="note">
+    For any questions during review, please contact us at <strong>https://usable.dev/contact.html</strong>
+  </div>
+
+  <div class="footer">
+    Usable Excel · https://usable.dev · Certification notes for Microsoft AppSource review
+  </div>
+
+</body>
+</html>

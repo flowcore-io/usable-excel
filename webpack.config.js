@@ -9,7 +9,10 @@ const urlProd = "https://flowcore-io.github.io/usable-excel/";
 
 async function getHttpsOptions() {
   const httpsOptions = await devCerts.getHttpsServerOptions();
-  return { ca: httpsOptions.ca, pfx: httpsOptions.pfx, passphrase: httpsOptions.passphrase };
+  // office-addin-dev-certs returns { ca, cert, key } (PEM) — NOT { pfx, passphrase }.
+  // Passing pfx/passphrase (undefined) makes webpack-dev-server fall back to its
+  // own self-signed server.pem, which the Office WebView rejects as untrusted.
+  return { ca: httpsOptions.ca, cert: httpsOptions.cert, key: httpsOptions.key };
 }
 
 module.exports = async (env, options) => {
@@ -96,6 +99,10 @@ module.exports = async (env, options) => {
       hot: true,
       headers: {
         "Access-Control-Allow-Origin": "*",
+        // Office WebView (WKWebView) aggressively caches the unhashed parent
+        // bundle (taskpane.js), so code changes don't appear on reload. Force
+        // revalidation in dev so a pane reload always fetches fresh assets.
+        "Cache-Control": "no-store",
       },
       server: {
         type: "https",

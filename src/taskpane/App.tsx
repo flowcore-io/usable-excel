@@ -1,6 +1,9 @@
 import * as React from "react";
 import { useAuth } from "./hooks/use-auth";
 import { useChatEmbed } from "./hooks/use-chat-embed";
+import { HistoryPanel } from "./components/HistoryPanel";
+import { DevInspector, persistInspectorOpen, readInspectorOpen } from "./components/DevInspector";
+import logoUrl from "../../assets/logo.png";
 
 // ---------------------------------------------------------------------------
 // ChatPane — only mounted when authenticated
@@ -8,21 +11,39 @@ import { useChatEmbed } from "./hooks/use-chat-embed";
 
 interface ChatPaneProps {
   accessToken: string;
-  refreshAccessToken: () => Promise<string | null>;
+  ensureValidToken: () => Promise<string | null>;
 }
 
-function ChatPane({ accessToken, refreshAccessToken }: ChatPaneProps): React.ReactElement {
+function ChatPane({ accessToken, ensureValidToken }: ChatPaneProps): React.ReactElement {
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
-  useChatEmbed(iframeRef, accessToken, refreshAccessToken);
+  const chatApi = useChatEmbed(iframeRef, accessToken, ensureValidToken);
+
+  // Dev inspector open-state lives here so the history-drawer footer button
+  // drives the same (persisted) state the inspector renders from. (No keyboard
+  // shortcut: it's only reachable with the drawer open, where the button is.)
+  const [inspectorOpen, setInspectorOpen] = React.useState(readInspectorOpen);
+  const toggleInspector = React.useCallback(() => {
+    setInspectorOpen((prev) => {
+      const next = !prev;
+      persistInspectorOpen(next);
+      return next;
+    });
+  }, []);
 
   return (
-    <iframe
-      ref={iframeRef}
-      src="about:blank"
-      title="Usable Chat"
-      style={styles.iframe}
-      allow="clipboard-read; clipboard-write"
-    />
+    <>
+      <iframe
+        ref={iframeRef}
+        src="about:blank"
+        title="Usable Chat"
+        style={styles.iframe}
+        allow="clipboard-read; clipboard-write"
+      />
+      {/* Phase 4 — local conversation history (list / switch / new / rename / delete / search) */}
+      <HistoryPanel api={chatApi} onToggleInspector={toggleInspector} />
+      {/* Dev inspector — hidden; opened from the drawer footer button */}
+      <DevInspector open={inspectorOpen} onClose={() => toggleInspector()} />
+    </>
   );
 }
 
@@ -37,7 +58,7 @@ function ChatPane({ accessToken, refreshAccessToken }: ChatPaneProps): React.Rea
  *  "authenticated"  — session active; mount ChatPane
  */
 export function App(): React.ReactElement {
-  const { state, accessToken, login, refreshAccessToken } = useAuth();
+  const { state, accessToken, login, ensureValidToken } = useAuth();
 
   if (state === "restoring") {
     return (
@@ -51,6 +72,7 @@ export function App(): React.ReactElement {
   if (state === "unauthenticated") {
     return (
       <div style={styles.center}>
+        <img src={logoUrl} alt="Usable" style={styles.logo} />
         <p style={styles.heading}>Excel Assistant</p>
         <p style={styles.label}>Sign in to start chatting with your workbook.</p>
         <button onClick={login} style={styles.button}>
@@ -64,7 +86,7 @@ export function App(): React.ReactElement {
   return (
     <ChatPane
       accessToken={accessToken!}
-      refreshAccessToken={refreshAccessToken}
+      ensureValidToken={ensureValidToken}
     />
   );
 }
@@ -88,6 +110,11 @@ const styles = {
     // System colors adapt automatically to Office light/dark theme
     background:     "Canvas",
     color:          "CanvasText",
+  },
+  logo: {
+    width:        96,
+    height:       96,
+    marginBottom: 8,
   },
   spinner: {
     width:          28,
