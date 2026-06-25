@@ -34,6 +34,8 @@ export interface AuthResult {
   logout: () => void;
   /** Fetch a fresh access token using the stored refresh token. */
   refreshAccessToken: () => Promise<string | null>;
+  /** Return current token if valid for >60s, otherwise refresh. */
+  ensureValidToken: () => Promise<string | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,8 +102,11 @@ export function useAuth(): AuthResult {
   const [state, setState]             = useState<AuthState>("restoring");
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dialogRef       = useRef<Office.Dialog | null>(null);
+  const refreshTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dialogRef         = useRef<Office.Dialog | null>(null);
+  const tokenExpiresAtRef = useRef<number | null>(null);
+  const accessTokenRef    = useRef<string | null>(null);
+  accessTokenRef.current  = accessToken;
 
   // -------------------------------------------------------------------------
   // Schedule silent token refresh
@@ -132,6 +137,7 @@ export function useAuth(): AuthResult {
 
     setAccessToken(result.accessToken);
     setState("authenticated");
+    tokenExpiresAtRef.current = Date.now() + result.expiresIn * 1000;
 
     if (result.refreshToken) saveRefreshToken(result.refreshToken);
 
@@ -141,6 +147,23 @@ export function useAuth(): AuthResult {
 
     return result.accessToken;
   }, [scheduleRefresh]);
+
+  // -------------------------------------------------------------------------
+  // ensureValidToken — return current token if still fresh, else refresh
+  // -------------------------------------------------------------------------
+
+  const ensureValidToken = useCallback(async (): Promise<string | null> => {
+    const expiresAt    = tokenExpiresAtRef.current;
+    const currentToken = accessTokenRef.current;
+
+    // Token is still valid for more than 60 seconds — return it without a network call
+    if (currentToken && expiresAt && (expiresAt - Date.now()) > 60_000) {
+      return currentToken;
+    }
+
+    // Token is expired or expiring soon — fetch a fresh one
+    return refreshAccessToken();
+  }, [refreshAccessToken]);
 
   // -------------------------------------------------------------------------
   // Restore session on mount
@@ -212,6 +235,7 @@ export function useAuth(): AuthResult {
 
               setAccessToken(data.accessToken);
               setState("authenticated");
+              tokenExpiresAtRef.current = Date.now() + (data.expiresIn ?? 300) * 1000;
               scheduleRefresh(data.expiresIn ?? 300, () => refreshAccessToken());
 
               if (data.refreshToken) saveRefreshToken(data.refreshToken);
@@ -245,5 +269,5 @@ export function useAuth(): AuthResult {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
   }, []);
 
-  return { state, accessToken, login, logout, refreshAccessToken };
+  return { state, accessToken, login, logout, refreshAccessToken, ensureValidToken };
 }
