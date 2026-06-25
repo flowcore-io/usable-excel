@@ -3,8 +3,8 @@ import { UsableChatEmbed } from "../lib/embed-sdk";
 import { excelToolSchemas, handleExcelToolCall } from "../lib/excel-tools";
 import { pushDebugLog } from "../lib/debug-log"; // feeds the dev inspector
 import {
+  DEFAULT_CONVERSATION_TITLE,
   appendMessage,
-  getCounts,
   getLastActive,
   loadConversation,
   renameConversation,
@@ -191,8 +191,13 @@ export function useChatEmbed(
             message: p.message,
           });
           await setLastActive(userId, p.conversationId);
-          const counts = await getCounts(userId);
-          pushDebugLog("store✓", { wrote: inserted ? "insert" : "update(dedup)", ...counts });
+          // Diagnostic only — keep it O(1). The full-store counts that used to
+          // live here cost 1+N IndexedDB scans on every message; getCounts() is
+          // still exported for the inspector to call on demand if needed.
+          pushDebugLog("store✓", {
+            wrote: inserted ? "insert" : "update(dedup)",
+            conversationId: p.conversationId,
+          });
           bumpStoreVersion();
         })();
       },
@@ -200,7 +205,7 @@ export function useChatEmbed(
         pushDebugLog("cb:CONVERSATION_RENAMED", p);
         const userId = userIdRef.current;
         if (!userId) return;
-        void renameConversation(userId, p.conversationId, p.title ?? "Embed Session").then(
+        void renameConversation(userId, p.conversationId, p.title ?? DEFAULT_CONVERSATION_TITLE).then(
           bumpStoreVersion
         );
       },

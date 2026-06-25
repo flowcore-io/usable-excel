@@ -180,7 +180,7 @@
     <li>All AI processing is handled by the Usable service at <code>https://api.usable.dev</code></li>
     <li>Authentication is handled by Keycloak at <code>https://auth.flowcore.io</code></li>
     <li>The add-in has <code>ReadWriteDocument</code> permissions — required to read and write spreadsheet data</li>
-    <li>No spreadsheet data is stored persistently — data is only processed within the active session</li>
+    <li>No spreadsheet data is sent to or stored on Usable servers. An optional chat history is stored locally in the browser's IndexedDB on the user's device and never leaves it; the user can delete it at any time from the in-app history panel</li>
   </ul>
 
   <div class="note">

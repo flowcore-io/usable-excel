@@ -90,8 +90,10 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-/** Placeholder title for a conversation the embed created without naming. */
-const DEFAULT_CONVERSATION_TITLE = "Embed Session";
+/** Placeholder title for a conversation the embed created without naming.
+ *  Single source of truth — also consumed by the capture wiring in
+ *  `use-chat-embed.ts` (rename-with-empty-title fallback). */
+export const DEFAULT_CONVERSATION_TITLE = "Embed Session";
 
 /** A conversation still on the placeholder (or empty) title — eligible for a
  *  derived display title from its first user message. */
@@ -180,7 +182,7 @@ export async function appendMessage(input: AppendMessageInput): Promise<{ insert
     await conversations.put({
       id: input.conversationId,
       userId: input.userId,
-      title: "Embed Session",
+      title: DEFAULT_CONVERSATION_TITLE,
       createdAt,
       updatedAt: bumped,
     });
