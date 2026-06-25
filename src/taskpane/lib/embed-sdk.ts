@@ -38,6 +38,11 @@ export interface UsableChatEmbedOptions {
   onConversationChange?: (conversationId: string | null) => void;
   /** Called when the embed requests a fresh token. Return the new access token, or null on failure. */
   onTokenRefreshRequired?: () => Promise<string | null>;
+  /**
+   * Raw tap on every validated iframe→parent message (after origin/source
+   * checks, before dispatch). Used by the Phase 0 on-screen diagnostic console.
+   */
+  onMessage?: (type: string, payload: unknown) => void;
 }
 
 export class UsableChatEmbed {
@@ -125,6 +130,14 @@ export class UsableChatEmbed {
     if (!data || typeof data !== "object" || !data.type) {
       return;
     }
+
+    // TEMP [Phase 0 verification] — surface every iframe→parent message so we can
+    // confirm stateless lifecycle events (CONVERSATION_CREATED / MESSAGE_CREATED /
+    // CONVERSATION_RENAMED) actually reach this origin once the embed is stateless.
+    // Logged to console AND tapped via onMessage for the on-screen debug console.
+    // Remove once verified.
+    console.debug("[UsableEmbed][rx]", data.type, data.payload ?? data);
+    this.options.onMessage?.(data.type, data.payload ?? data);
 
     switch (data.type) {
       case "READY":

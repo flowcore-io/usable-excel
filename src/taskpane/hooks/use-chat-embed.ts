@@ -1,6 +1,7 @@
 import { RefObject, useEffect, useRef } from "react";
 import { UsableChatEmbed } from "../lib/embed-sdk";
 import { excelToolSchemas, handleExcelToolCall } from "../lib/excel-tools";
+import { pushDebugLog } from "../lib/debug-log"; // TEMP [Phase 0]
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -19,12 +20,12 @@ const IFRAME_ORIGIN = "https://chat.usable.dev";
 /**
  * @param iframeRef        - Ref to the chat iframe element.
  * @param accessToken      - Keycloak JWT to authenticate the embed. Pass null when unauthenticated.
- * @param refreshAccessToken - Called when the embed requests a new token.
+ * @param ensureValidToken - Returns current token if fresh (>60s), otherwise refreshes.
  */
 export function useChatEmbed(
   iframeRef: RefObject<HTMLIFrameElement>,
   accessToken: string | null,
-  refreshAccessToken: () => Promise<string | null>
+  ensureValidToken: () => Promise<string | null>
 ): void {
   const embedRef = useRef<UsableChatEmbed | null>(null);
 
@@ -59,11 +60,14 @@ export function useChatEmbed(
     const embed = new UsableChatEmbed(iframe, {
       iframeOrigin: IFRAME_ORIGIN,
 
+      // TEMP [Phase 0] — feed the on-screen debug console.
+      onMessage: (type, payload) => pushDebugLog(type, payload),
+
       onToolCall: async (tool, args, _requestId) => {
         return handleExcelToolCall(tool, args);
       },
 
-      onTokenRefreshRequired: refreshAccessToken,
+      onTokenRefreshRequired: ensureValidToken,
 
       onError: (code, message) => {
         console.error(`[UsableEmbed] Error ${code}: ${message}`);
@@ -95,7 +99,14 @@ export function useChatEmbed(
 
   useEffect(() => {
     if (accessToken && embedRef.current) {
-      embedRef.current.setAuth(accessToken);
+      // Validate freshness before pushing token to the embed.
+      // If the proactive timer fired late (WebView throttling), this
+      // will detect near-expiry and fetch a fresh token first.
+      ensureValidToken().then((validToken) => {
+        if (validToken && embedRef.current) {
+          embedRef.current.setAuth(validToken);
+        }
+      });
     }
-  }, [accessToken]);
+  }, [accessToken, ensureValidToken]);
 }
