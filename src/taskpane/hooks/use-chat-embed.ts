@@ -5,6 +5,8 @@ import { pushDebugLog } from "../lib/debug-log"; // TEMP [Phase 0]
 import {
   appendMessage,
   getCounts,
+  getLastActive,
+  loadConversation,
   renameConversation,
   setLastActive,
   upsertConversation,
@@ -144,7 +146,22 @@ export function useChatEmbed(
         if (!userId) return;
         void renameConversation(userId, p.conversationId, p.title ?? "Embed Session");
       },
-      onConversationMessagesUpserted: (p) => pushDebugLog("cb:MESSAGES_UPSERTED", p),
+      // Phase 3 — ack for a parent-driven restore (UPSERT_CONVERSATION_MESSAGES).
+      // Gate on p.ok: on failure, surface it (the transcript silently stayed
+      // empty otherwise). On success, reassert lastActive to whatever id the
+      // embed reports — this keeps our pointer aligned if the embed adopts or
+      // re-mints the conversation id during hydration (the continuity crux).
+      onConversationMessagesUpserted: (p) => {
+        pushDebugLog("cb:MESSAGES_UPSERTED", p);
+        if (!p.ok) {
+          console.error(`[UsableEmbed] Restore failed: ${p.error ?? "unknown error"}`);
+          return;
+        }
+        const userId = userIdRef.current;
+        if (userId && p.conversationId) {
+          void setLastActive(userId, p.conversationId);
+        }
+      },
     });
 
     embedRef.current = embed;
@@ -156,6 +173,26 @@ export function useChatEmbed(
       embed.registerTools(excelToolSchemas);
       if (accessTokenRef.current) {
         embed.setAuth(accessTokenRef.current);
+      }
+
+      // Phase 3 — restore the user's last conversation from local history.
+      // Runs after setAuth and only once the iframe is READY (postMessages sent
+      // before READY are dropped). Mode "replace-all" makes a duplicate run
+      // (StrictMode double-mount) harmless. No-op on a fresh start (AC4).
+      const userId = userIdRef.current;
+      if (userId) {
+        void (async () => {
+          const lastId = await getLastActive(userId);
+          if (!lastId) return; // AC4 — nothing to restore, fresh start
+          const { messages } = await loadConversation(lastId);
+          if (!messages.length) return;
+          pushDebugLog("restore→upsert", { conversationId: lastId, count: messages.length });
+          embed.upsertConversationMessages({
+            conversationId: lastId,
+            messages: messages.map((m) => m.message), // raw ExportedMessage[]
+            mode: "replace-all",
+          });
+        })();
       }
     });
 
