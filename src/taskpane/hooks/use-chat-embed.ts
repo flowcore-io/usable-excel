@@ -2,6 +2,32 @@ import { RefObject, useEffect, useRef } from "react";
 import { UsableChatEmbed } from "../lib/embed-sdk";
 import { excelToolSchemas, handleExcelToolCall } from "../lib/excel-tools";
 import { pushDebugLog } from "../lib/debug-log"; // TEMP [Phase 0]
+import {
+  appendMessage,
+  getCounts,
+  renameConversation,
+  setLastActive,
+  upsertConversation,
+} from "../lib/history-store";
+
+/**
+ * Decode the `sub` (user id) claim from a JWT without verifying it — used only
+ * to scope local history per user, never for trust decisions. Returns null on
+ * any malformed token.
+ */
+function getUserIdFromToken(token: string | null): string | null {
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "===".slice((b64.length + 3) % 4);
+    const data = JSON.parse(atob(padded));
+    return typeof data.sub === "string" ? data.sub : null;
+  } catch {
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -32,6 +58,12 @@ export function useChatEmbed(
   // Ref so the onReady closure always sees the latest token without re-creating the embed.
   const accessTokenRef = useRef<string | null>(accessToken);
   accessTokenRef.current = accessToken;
+
+  // Current user id (JWT sub) for scoping local history. Kept in a ref so the
+  // persistence callbacks (created once with the embed) always read the latest
+  // value across token refreshes. The sub is stable across refreshes.
+  const userIdRef = useRef<string | null>(getUserIdFromToken(accessToken));
+  userIdRef.current = getUserIdFromToken(accessToken);
 
   // -------------------------------------------------------------------------
   // Create / destroy the embed instance when the iframe mounts
@@ -73,13 +105,45 @@ export function useChatEmbed(
         console.error(`[UsableEmbed] Error ${code}: ${message}`);
       },
 
-      // Phase 1 — stateless parent-persistence callbacks wired through the SDK.
-      // For now they only surface in the debug console (proves the dedicated
-      // dispatch path works); Phase 2 replaces these with history-store writes
-      // (idempotent, keyed on message.id; userId-scoped).
-      onConversationCreated: (p) => pushDebugLog("cb:CONVERSATION_CREATED", p),
-      onMessageCreated: (p) => pushDebugLog("cb:MESSAGE_CREATED", p),
-      onConversationRenamed: (p) => pushDebugLog("cb:CONVERSATION_RENAMED", p),
+      // Phase 2 — capture chat into the local IndexedDB history store.
+      // Writes are idempotent (put-by-id on message.id) and scoped by userId,
+      // and guarded until the user id is known. The pushDebugLog lines remain
+      // as on-screen verification (insert/update + row counts) since the Office
+      // pane has no easy DevTools.
+      onConversationCreated: (p) => {
+        pushDebugLog("cb:CONVERSATION_CREATED", p);
+        const userId = userIdRef.current;
+        if (!userId) return;
+        void upsertConversation({
+          id: p.conversationId,
+          userId,
+          title: p.title,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+        });
+      },
+      onMessageCreated: (p) => {
+        pushDebugLog("cb:MESSAGE_CREATED", p);
+        const userId = userIdRef.current;
+        if (!userId) return;
+        void (async () => {
+          const { inserted } = await appendMessage({
+            userId,
+            conversationId: p.conversationId,
+            kind: p.kind,
+            message: p.message,
+          });
+          await setLastActive(userId, p.conversationId);
+          const counts = await getCounts(userId);
+          pushDebugLog("store✓", { wrote: inserted ? "insert" : "update(dedup)", ...counts });
+        })();
+      },
+      onConversationRenamed: (p) => {
+        pushDebugLog("cb:CONVERSATION_RENAMED", p);
+        const userId = userIdRef.current;
+        if (!userId) return;
+        void renameConversation(userId, p.conversationId, p.title ?? "Embed Session");
+      },
       onConversationMessagesUpserted: (p) => pushDebugLog("cb:MESSAGES_UPSERTED", p),
     });
 
