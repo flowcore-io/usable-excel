@@ -72,6 +72,15 @@ export function useChatEmbed(
       onError: (code, message) => {
         console.error(`[UsableEmbed] Error ${code}: ${message}`);
       },
+
+      // Phase 1 — stateless parent-persistence callbacks wired through the SDK.
+      // For now they only surface in the debug console (proves the dedicated
+      // dispatch path works); Phase 2 replaces these with history-store writes
+      // (idempotent, keyed on message.id; userId-scoped).
+      onConversationCreated: (p) => pushDebugLog("cb:CONVERSATION_CREATED", p),
+      onMessageCreated: (p) => pushDebugLog("cb:MESSAGE_CREATED", p),
+      onConversationRenamed: (p) => pushDebugLog("cb:CONVERSATION_RENAMED", p),
+      onConversationMessagesUpserted: (p) => pushDebugLog("cb:MESSAGES_UPSERTED", p),
     });
 
     embedRef.current = embed;
