@@ -90,6 +90,23 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/** Placeholder title for a conversation the embed created without naming. */
+const DEFAULT_CONVERSATION_TITLE = "Embed Session";
+
+/** A conversation still on the placeholder (or empty) title — eligible for a
+ *  derived display title from its first user message. */
+function isPlaceholderTitle(title: string): boolean {
+  return !title || title === DEFAULT_CONVERSATION_TITLE;
+}
+
+/** Build a short, single-line title from a user message's content. */
+function deriveTitleFromContent(content: unknown): string | null {
+  if (typeof content !== "string") return null;
+  const text = content.replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  return text.length > 60 ? `${text.slice(0, 57).trimEnd()}…` : text;
+}
+
 // ---------------------------------------------------------------------------
 // Writes (all idempotent via put-by-id)
 // ---------------------------------------------------------------------------
@@ -110,7 +127,7 @@ export async function upsertConversation(input: UpsertConversationInput): Promis
   const record: ConversationRecord = {
     id: input.id,
     userId: input.userId,
-    title: input.title ?? existing?.title ?? "Embed Session",
+    title: input.title ?? existing?.title ?? DEFAULT_CONVERSATION_TITLE,
     createdAt: existing?.createdAt ?? input.createdAt ?? nowIso(),
     updatedAt: input.updatedAt ?? nowIso(),
   };
@@ -194,6 +211,34 @@ export async function setLastActive(userId: string, conversationId: string | nul
   await db.put("meta", { userId, lastActiveConversationId: conversationId });
 }
 
+/**
+ * Delete a conversation and every message that belongs to it, in a single
+ * transaction (Phase 4). If the deleted conversation was the restore pointer
+ * (`meta.lastActiveConversationId`), clear it so the next reload starts fresh
+ * instead of trying to restore a conversation that no longer exists.
+ */
+export async function deleteConversation(userId: string, conversationId: string): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(["conversations", "messages", "meta"], "readwrite");
+
+  // Remove all messages for this conversation via the by-conversation index.
+  let cursor = await tx.objectStore("messages").index("by-conversation").openCursor(conversationId);
+  while (cursor) {
+    await cursor.delete();
+    cursor = await cursor.continue();
+  }
+
+  await tx.objectStore("conversations").delete(conversationId);
+
+  // Drop the restore pointer if it referenced the conversation we just deleted.
+  const meta = await tx.objectStore("meta").get(userId);
+  if (meta && meta.lastActiveConversationId === conversationId) {
+    await tx.objectStore("meta").put({ userId, lastActiveConversationId: null });
+  }
+
+  await tx.done;
+}
+
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
@@ -215,11 +260,29 @@ export async function loadConversation(
   return { conversation, messages };
 }
 
-/** All conversations for a user, newest activity first. */
+/**
+ * All conversations for a user, newest activity first.
+ *
+ * Stateless embeds create conversations untitled, so any row still on the
+ * placeholder title gets a readable display title derived from its first user
+ * message (the embed never auto-titles them). This is display-only — the stored
+ * title stays as-is until a real rename or an embed title-sync — so it also
+ * backfills conversations captured before this behaviour existed.
+ */
 export async function listConversations(userId: string): Promise<ConversationRecord[]> {
   const db = await getDB();
   const all = await db.getAllFromIndex("conversations", "by-user", userId);
   all.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
+
+  for (const conv of all) {
+    if (!isPlaceholderTitle(conv.title)) continue;
+    const messages = await db.getAllFromIndex("messages", "by-conversation", conv.id);
+    messages.sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
+    const firstUser = messages.find((m) => m.kind === "user");
+    const derived = deriveTitleFromContent(firstUser?.message.content);
+    if (derived) conv.title = derived;
+  }
+
   return all;
 }
 

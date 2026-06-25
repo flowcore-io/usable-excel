@@ -1,10 +1,8 @@
 /**
- * TEMP [Phase 0 verification] — tiny in-memory log store so we can render an
- * on-screen console in the task pane and confirm the stateless embed emits
- * CONVERSATION_CREATED / MESSAGE_CREATED to our origin (Mac Office add-ins
- * don't expose Inspect Element on the parent pane).
- *
- * Remove (or fold into a real diagnostics surface) once Phase 0 is verified.
+ * Tiny in-memory, subscribable log store that backs the {@link DevInspector}
+ * (an opt-in, DevTools-style event log). Mac Office task panes don't expose
+ * Inspect Element, so the add-in keeps its own event stream here and renders it
+ * on demand for developers.
  */
 
 export interface DebugLogEntry {

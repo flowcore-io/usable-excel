@@ -130,7 +130,7 @@ export interface UsableChatEmbedOptions {
 
   /**
    * Raw tap on every validated iframe→parent message (after origin/source
-   * checks, before dispatch). Used by the Phase 0 on-screen diagnostic console.
+   * checks, before dispatch). Feeds the host's opt-in dev inspector.
    */
   onMessage?: (type: string, payload: unknown) => void;
 }
@@ -243,10 +243,9 @@ export class UsableChatEmbed {
       return;
     }
 
-    // TEMP [Phase 0 verification] — surface every iframe→parent message so we can
-    // confirm stateless lifecycle events actually reach this origin. Logged to
-    // console AND tapped via onMessage for the on-screen debug console.
-    // Remove once the diagnostic console is no longer needed.
+    // Surface every validated iframe→parent message to the host: console for
+    // normal debugging, and the optional `onMessage` tap that feeds the dev
+    // inspector (Office task panes have no Inspect Element on Mac).
     console.debug("[UsableEmbed][rx]", data.type, data.payload ?? data);
     this.options.onMessage?.(data.type, data.payload ?? data);
 

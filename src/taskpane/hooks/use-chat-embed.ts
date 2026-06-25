@@ -1,7 +1,7 @@
-import { RefObject, useEffect, useRef } from "react";
+import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { UsableChatEmbed } from "../lib/embed-sdk";
 import { excelToolSchemas, handleExcelToolCall } from "../lib/excel-tools";
-import { pushDebugLog } from "../lib/debug-log"; // TEMP [Phase 0]
+import { pushDebugLog } from "../lib/debug-log"; // feeds the dev inspector
 import {
   appendMessage,
   getCounts,
@@ -11,6 +11,45 @@ import {
   setLastActive,
   upsertConversation,
 } from "../lib/history-store";
+
+/**
+ * Imperative + reactive surface returned by {@link useChatEmbed}. The history
+ * panel (Phase 4) drives the embed through this instead of touching the embed
+ * instance directly.
+ */
+export interface ChatEmbedApi {
+  /** JWT `sub` of the signed-in user — scopes every local-history read. */
+  userId: string | null;
+  /** Conversation currently shown in the embed (for list highlighting). */
+  activeConversationId: string | null;
+  /** Bumps whenever the embed writes to the local store (create/message/rename),
+   *  so the panel can re-read the conversation list without manual refresh. */
+  storeVersion: number;
+  /** Re-hydrate the embed with a stored conversation (reuses the Phase 3 path). */
+  switchConversation: (conversationId: string) => Promise<void>;
+  /** Start a fresh conversation in the embed and clear the restore pointer. */
+  newConversation: () => void;
+}
+
+/**
+ * Re-hydrate the embed's transcript from a locally-stored conversation. Shared
+ * by restore-on-load (`onReady`, Phase 3) and the panel's switch action
+ * (Phase 4): a `replace-all` upsert swaps the whole transcript and the embed
+ * adopts the conversation id, so subsequent turns continue it (continuity
+ * verified in Phase 3, solution `9e5e358a`).
+ */
+async function restoreConversationIntoEmbed(
+  embed: UsableChatEmbed,
+  conversationId: string
+): Promise<void> {
+  const { messages } = await loadConversation(conversationId);
+  pushDebugLog("restore→upsert", { conversationId, count: messages.length });
+  embed.upsertConversationMessages({
+    conversationId,
+    messages: messages.map((m) => m.message), // raw ExportedMessage[]
+    mode: "replace-all",
+  });
+}
 
 /**
  * Decode the `sub` (user id) claim from a JWT without verifying it — used only
@@ -54,7 +93,7 @@ export function useChatEmbed(
   iframeRef: RefObject<HTMLIFrameElement>,
   accessToken: string | null,
   ensureValidToken: () => Promise<string | null>
-): void {
+): ChatEmbedApi {
   const embedRef = useRef<UsableChatEmbed | null>(null);
 
   // Ref so the onReady closure always sees the latest token without re-creating the embed.
@@ -64,8 +103,17 @@ export function useChatEmbed(
   // Current user id (JWT sub) for scoping local history. Kept in a ref so the
   // persistence callbacks (created once with the embed) always read the latest
   // value across token refreshes. The sub is stable across refreshes.
-  const userIdRef = useRef<string | null>(getUserIdFromToken(accessToken));
-  userIdRef.current = getUserIdFromToken(accessToken);
+  const userId = getUserIdFromToken(accessToken);
+  const userIdRef = useRef<string | null>(userId);
+  userIdRef.current = userId;
+
+  // Reactive surface for the history panel (Phase 4).
+  // - activeConversationId: which conversation the embed is showing (highlight).
+  // - storeVersion: bumped on every embed-driven store write so the panel
+  //   re-reads the list (new conversation / new message / rename).
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [storeVersion, setStoreVersion] = useState(0);
+  const bumpStoreVersion = useCallback(() => setStoreVersion((v) => v + 1), []);
 
   // -------------------------------------------------------------------------
   // Create / destroy the embed instance when the iframe mounts
@@ -94,7 +142,7 @@ export function useChatEmbed(
     const embed = new UsableChatEmbed(iframe, {
       iframeOrigin: IFRAME_ORIGIN,
 
-      // TEMP [Phase 0] — feed the on-screen debug console.
+      // Feed the dev inspector (opened with Ctrl/⌘+Shift+D) with the raw stream.
       onMessage: (type, payload) => pushDebugLog(type, payload),
 
       onToolCall: async (tool, args, _requestId) => {
@@ -105,6 +153,13 @@ export function useChatEmbed(
 
       onError: (code, message) => {
         console.error(`[UsableEmbed] Error ${code}: ${message}`);
+      },
+
+      // Keep the panel's active-row highlight in sync with whatever the embed
+      // currently shows (fires after restore and when a new conversation gets
+      // its id on the first turn).
+      onConversationChange: (conversationId) => {
+        setActiveConversationId(conversationId);
       },
 
       // Phase 2 — capture chat into the local IndexedDB history store.
@@ -122,7 +177,7 @@ export function useChatEmbed(
           title: p.title,
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
-        });
+        }).then(bumpStoreVersion);
       },
       onMessageCreated: (p) => {
         pushDebugLog("cb:MESSAGE_CREATED", p);
@@ -138,13 +193,16 @@ export function useChatEmbed(
           await setLastActive(userId, p.conversationId);
           const counts = await getCounts(userId);
           pushDebugLog("store✓", { wrote: inserted ? "insert" : "update(dedup)", ...counts });
+          bumpStoreVersion();
         })();
       },
       onConversationRenamed: (p) => {
         pushDebugLog("cb:CONVERSATION_RENAMED", p);
         const userId = userIdRef.current;
         if (!userId) return;
-        void renameConversation(userId, p.conversationId, p.title ?? "Embed Session");
+        void renameConversation(userId, p.conversationId, p.title ?? "Embed Session").then(
+          bumpStoreVersion
+        );
       },
       // Phase 3 — ack for a parent-driven restore (UPSERT_CONVERSATION_MESSAGES).
       // Gate on p.ok: on failure, surface it (the transcript silently stayed
@@ -184,14 +242,7 @@ export function useChatEmbed(
         void (async () => {
           const lastId = await getLastActive(userId);
           if (!lastId) return; // AC4 — nothing to restore, fresh start
-          const { messages } = await loadConversation(lastId);
-          if (!messages.length) return;
-          pushDebugLog("restore→upsert", { conversationId: lastId, count: messages.length });
-          embed.upsertConversationMessages({
-            conversationId: lastId,
-            messages: messages.map((m) => m.message), // raw ExportedMessage[]
-            mode: "replace-all",
-          });
+          await restoreConversationIntoEmbed(embed, lastId);
         })();
       }
     });
@@ -219,4 +270,30 @@ export function useChatEmbed(
       });
     }
   }, [accessToken, ensureValidToken]);
+
+  // -------------------------------------------------------------------------
+  // Imperative API for the history panel (Phase 4)
+  // -------------------------------------------------------------------------
+
+  const switchConversation = useCallback(async (conversationId: string) => {
+    const embed = embedRef.current;
+    const uid = userIdRef.current;
+    if (!embed || !uid) return;
+    // Optimistic highlight; the embed confirms via CONVERSATION_CHANGED.
+    setActiveConversationId(conversationId);
+    await restoreConversationIntoEmbed(embed, conversationId);
+    await setLastActive(uid, conversationId);
+  }, []);
+
+  const newConversation = useCallback(() => {
+    const embed = embedRef.current;
+    if (!embed) return;
+    embed.newConversation();
+    setActiveConversationId(null);
+    // Clear the restore pointer now; the first turn re-sets it via onMessageCreated.
+    const uid = userIdRef.current;
+    if (uid) void setLastActive(uid, null);
+  }, []);
+
+  return { userId, activeConversationId, storeVersion, switchConversation, newConversation };
 }

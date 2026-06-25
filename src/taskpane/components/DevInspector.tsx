@@ -7,17 +7,39 @@ import {
 } from "../lib/debug-log";
 
 /**
- * TEMP [Phase 0 verification] — on-screen console overlay.
+ * DevInspector — an opt-in, DevTools-style event log for the add-in.
  *
- * Mac Office add-ins don't expose Inspect Element on the parent task pane, so
- * this renders the raw iframe→parent message stream (tapped via the SDK's
- * onMessage hook) directly in the pane. Lets us confirm the stateless embed
- * emits CONVERSATION_CREATED / MESSAGE_CREATED to our origin.
+ * Mac Office task panes don't expose Inspect Element, so this surfaces the raw
+ * iframe→parent message stream (tapped via the SDK's `onMessage` hook) plus the
+ * store's own breadcrumbs (`store✓`, `restore→upsert`). It's hidden from normal
+ * users; developers open it from the "Inspector" button in the history drawer
+ * footer. The open/closed state is owned by `ChatPane` and persisted in
+ * localStorage.
  *
- * Remove once Phase 0 is verified (or fold into a real diagnostics surface).
+ * Controlled component: `open` / `onClose` are supplied by the parent.
  */
 
-// Highlight the lifecycle events Phase 0 is gating on.
+const STORAGE_KEY = "usable-excel:devInspector";
+
+/** Read the persisted open state — used by the parent to seed initial state. */
+export function readInspectorOpen(): boolean {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Persist the open state so the inspector survives pane reloads. */
+export function persistInspectorOpen(open: boolean): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, open ? "1" : "0");
+  } catch {
+    // localStorage may be unavailable in some WebView contexts — non-fatal.
+  }
+}
+
+// Lifecycle events worth colour-coding in the stream.
 const HIGHLIGHT: Record<string, string> = {
   CONVERSATION_CREATED: "#7ee787",
   MESSAGE_CREATED: "#79c0ff",
@@ -25,76 +47,67 @@ const HIGHLIGHT: Record<string, string> = {
   CONVERSATION_MESSAGES_UPSERTED: "#ffa657",
 };
 
-export function DebugConsole(): React.ReactElement {
-  const entries = React.useSyncExternalStore<DebugLogEntry[]>(
-    subscribeDebugLog,
-    getDebugLogs
-  );
-  const [open, setOpen] = React.useState(true);
+interface DevInspectorProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export function DevInspector({ open, onClose }: DevInspectorProps): React.ReactElement | null {
+  const entries = React.useSyncExternalStore<DebugLogEntry[]>(subscribeDebugLog, getDebugLogs);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to newest.
+  // Auto-scroll to newest while open.
   React.useEffect(() => {
     if (open && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [entries, open]);
 
-  const seenTypes = new Set(entries.map((e) => e.type));
-  const gatePassed =
-    seenTypes.has("CONVERSATION_CREATED") && seenTypes.has("MESSAGE_CREATED");
+  if (!open) return null;
 
   return (
     <div style={styles.wrap}>
       <div style={styles.header}>
         <span style={styles.title}>
-          [Phase 0] rx events&nbsp;
-          <span style={{ color: gatePassed ? "#7ee787" : "#ffa657" }}>
-            {gatePassed ? "✓ lifecycle events seen" : "waiting…"}
-          </span>
+          Inspector&nbsp;<span style={styles.hint}>· events</span>
         </span>
         <span style={styles.headerActions}>
           <span style={styles.count}>{entries.length}</span>
           <button style={styles.btn} onClick={() => clearDebugLogs()}>
             clear
           </button>
-          <button style={styles.btn} onClick={() => setOpen((o) => !o)}>
-            {open ? "hide" : "show"}
+          <button style={styles.btn} onClick={onClose} aria-label="Close inspector">
+            close
           </button>
         </span>
       </div>
 
-      {open && (
-        <div ref={scrollRef} style={styles.body}>
-          {entries.length === 0 ? (
-            <div style={styles.empty}>
-              No messages yet — send a chat message to capture events.
+      <div ref={scrollRef} style={styles.body}>
+        {entries.length === 0 ? (
+          <div style={styles.empty}>No events yet — interact with the chat to capture activity.</div>
+        ) : (
+          entries.map((e) => (
+            <div key={e.id} style={styles.row}>
+              <span style={styles.ts}>{e.ts}</span>
+              <span
+                style={{
+                  ...styles.type,
+                  color: HIGHLIGHT[e.type] ?? "#c9d1d9",
+                  fontWeight: HIGHLIGHT[e.type] ? 700 : 400,
+                }}
+              >
+                {e.type}
+              </span>
+              <span style={styles.detail}>{e.detail}</span>
             </div>
-          ) : (
-            entries.map((e) => (
-              <div key={e.id} style={styles.row}>
-                <span style={styles.ts}>{e.ts}</span>
-                <span
-                  style={{
-                    ...styles.type,
-                    color: HIGHLIGHT[e.type] ?? "#c9d1d9",
-                    fontWeight: HIGHLIGHT[e.type] ? 700 : 400,
-                  }}
-                >
-                  {e.type}
-                </span>
-                <span style={styles.detail}>{e.detail}</span>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+          ))
+        )}
+      </div>
     </div>
   );
 }
 
-const MONO =
-  'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
 
 const styles = {
   wrap: {
@@ -123,6 +136,7 @@ const styles = {
     flex: "0 0 auto" as const,
   },
   title: { fontWeight: 600 as const },
+  hint: { color: "#8b949e", fontWeight: 400 as const },
   headerActions: {
     display: "flex" as const,
     alignItems: "center" as const,

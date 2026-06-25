@@ -1,7 +1,8 @@
 import * as React from "react";
 import { useAuth } from "./hooks/use-auth";
 import { useChatEmbed } from "./hooks/use-chat-embed";
-import { DebugConsole } from "./components/DebugConsole"; // TEMP [Phase 0]
+import { HistoryPanel } from "./components/HistoryPanel";
+import { DevInspector, persistInspectorOpen, readInspectorOpen } from "./components/DevInspector";
 import logoUrl from "../../assets/logo.png";
 
 // ---------------------------------------------------------------------------
@@ -15,7 +16,19 @@ interface ChatPaneProps {
 
 function ChatPane({ accessToken, ensureValidToken }: ChatPaneProps): React.ReactElement {
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
-  useChatEmbed(iframeRef, accessToken, ensureValidToken);
+  const chatApi = useChatEmbed(iframeRef, accessToken, ensureValidToken);
+
+  // Dev inspector open-state lives here so the history-drawer footer button
+  // drives the same (persisted) state the inspector renders from. (No keyboard
+  // shortcut: it's only reachable with the drawer open, where the button is.)
+  const [inspectorOpen, setInspectorOpen] = React.useState(readInspectorOpen);
+  const toggleInspector = React.useCallback(() => {
+    setInspectorOpen((prev) => {
+      const next = !prev;
+      persistInspectorOpen(next);
+      return next;
+    });
+  }, []);
 
   return (
     <>
@@ -26,8 +39,10 @@ function ChatPane({ accessToken, ensureValidToken }: ChatPaneProps): React.React
         style={styles.iframe}
         allow="clipboard-read; clipboard-write"
       />
-      {/* TEMP [Phase 0] — on-screen rx event console */}
-      <DebugConsole />
+      {/* Phase 4 — local conversation history (list / switch / new / rename / delete / search) */}
+      <HistoryPanel api={chatApi} onToggleInspector={toggleInspector} />
+      {/* Dev inspector — hidden; opened from the drawer footer button */}
+      <DevInspector open={inspectorOpen} onClose={() => toggleInspector()} />
     </>
   );
 }
